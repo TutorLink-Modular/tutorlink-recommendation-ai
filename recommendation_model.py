@@ -10,9 +10,9 @@ load_dotenv()
 mongo_uri = os.getenv("MONGO_URI")
 client = MongoClient(mongo_uri)
 
-# ✨ Este método accede a la colección correcta
+# ✨ Obtener la colección según categoría
 def get_collection_by_category(category):
-    db_name = mongo_uri.split("/")[-1].split("?")[0]  # Extrae el nombre de la DB
+    db_name = mongo_uri.split("/")[-1].split("?")[0]
     db = client[db_name]
 
     if category == "disciplinar":
@@ -26,7 +26,10 @@ def recommend(title, category="disciplinar", n_recommendations=3):
     # 🔍 Obtener colección desde MongoDB según categoría
     collection = get_collection_by_category(category)
 
-    data = pd.DataFrame(list(collection.find({}, {"title": 1, "description": 1, "text": 1, "_id": 1})))
+    # 🔹 Incluimos también el campo "image"
+    data = pd.DataFrame(list(collection.find(
+        {}, {"title": 1, "description": 1, "text": 1, "image": 1, "_id": 1}
+    )))
 
     if data.empty:
         raise ValueError("No hay datos en la colección.")
@@ -34,7 +37,7 @@ def recommend(title, category="disciplinar", n_recommendations=3):
     if title not in data["title"].values:
         return []
 
-    # 🔠 Vectorizamos el campo de texto completo
+    # 🔠 Vectorizamos el campo de texto
     vectorizer = TfidfVectorizer(stop_words="english")
     tfidf_matrix = vectorizer.fit_transform(data["text"])
 
@@ -43,7 +46,7 @@ def recommend(title, category="disciplinar", n_recommendations=3):
 
     similar_indices = cosine_sim.argsort()[-(n_recommendations + 1):-1][::-1]
 
-    recommended_topics = data.iloc[similar_indices][["_id", "title", "description"]].to_dict(orient="records")
-
+    # 🔹 Incluimos el campo "image" en la salida
+    recommended_topics = data.iloc[similar_indices][["_id", "title", "description", "image"]].to_dict(orient="records")
 
     return recommended_topics
